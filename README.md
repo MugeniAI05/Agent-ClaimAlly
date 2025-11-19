@@ -1,5 +1,5 @@
 # Agent-ClaimAlly 
-### Problem Statement — the problem you're trying to solve, and why it matters
+### Problem Statement
 
 Patients in the U.S. lose billions of dollars each year to wrong or unfairly denied medical bills.
 
@@ -14,7 +14,7 @@ The Patient Advocate agent is designed to level the playing field: it helps a pa
 
 ---
 
-### Why agents? — why agents are the right solution
+### why agents are the right solution
 
 This problem is naturally an assembly line of expert tasks:
 
@@ -36,7 +36,7 @@ Agents fit because:
 
 ---
 
-### What you created — overall architecture
+### What I created — overall architecture
 
 **Project Name:** ClaimAlly 
 
@@ -152,7 +152,7 @@ If the user asks, for example, “Can you diagnose this pain?” the `MedicalAdv
 
 ---
 
-### The Build — how you created it, tools & technologies used
+### The Build — how I created it, tools & technologies used
 
 #### Core stack
 
