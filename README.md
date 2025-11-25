@@ -1,12 +1,12 @@
 # Agentic Quant Research Lab
 
+  ![Project Thumbnail](thumbnail.jpg)
+  
 ## 1. Problem Statement: The "Analyst's Bottleneck"
 Quantitative research is traditionally a disjointed process. Traders must bridge the gap between **hard numerical data** (price action, volatility) and **soft qualitative data** (news sentiment, macro narratives).
 * **The Pain Point:** Manually fetching OHLCV data, cleaning it, reading hundreds of headlines, and running backtests across multiple tickers is slow and error-prone.
 * **The Scaling Issue:** A human analyst cannot monitor hundreds of tickers simultaneously for specific signal divergences (e.g., "Price is rising despite negative news").
 * **The Goal:** Automate the "grunt work" of data ingestion, feature engineering, and initial signal detection so humans can focus on high-level strategy.
-
-  ![Project Thumbnail](thumbnail.jpg)
 
 ## 2. Solution: The Agentic Workflow
 The **Agentic Quant Research Lab** is an autonomous system that executes the full lifecycle of preliminary market research.
