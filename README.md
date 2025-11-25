@@ -1,154 +1,133 @@
-# Agent-ClaimAlly 
+# Agentic Quant Research Lab
+
 ### Problem Statement
 
-Patients in the U.S. lose billions of dollars each year to wrong or unfairly denied medical bills.
+Quantitative analysts and retail traders lose valuable opportunities because comprehensive market research is slow, disjointed, and prone to human error.
 
 The core problems:
+- **Data Overload:** Bridging the gap between hard numerical data (price action, volatility) and soft qualitative data (news sentiment) requires switching between multiple disjointed tools.
+- **Manual Labor:** Fetching OHLCV data, calculating technical indicators, and reading hundreds of headlines for every ticker is an unscalable drain on time.
+- **Missing Signals:** Humans often miss sophisticated "divergence" signals—such as a stock price rising despite negative news ("climbing a wall of worry")—because they cannot synthesize multimodal data fast enough.
+- **Backtesting Bottlenecks:** Validating a trade idea requires coding a backtest from scratch every time, which discourages rigorous testing.
 
-- Bills are full of CPT/ICD-10 codes, jargon, and fine print that most patients can’t interpret.  
-- Insurance policies are long PDF documents with buried coverage rules.  
-- Appeals require structured, legalistic letters that reference exact policy clauses and billing codes.  
-- Patients are effectively fighting against automated denial systems without comparable tools, time, or expertise.
-
-The Patient Advocate agent is designed to level the playing field: it helps a patient understand their bill, compare it to their own insurance policy, and generate a strong, policy-grounded appeal letter when a denial looks incorrect.
+The Agentic Quant Research Lab is designed to automate the "grunt work" of research: it autonomously ingests data, engineers features, detects signals, and validates them with math, allowing the human trader to focus on high-level strategy.
 
 ---
 
-### why agents are the right solution
+### Why agents are the right solution
 
 This problem is naturally an assembly line of expert tasks:
-
-- Read and interpret a complex, multimodal input (bill image + policy PDF).  
-- Cross-check the bill against policy rules and past context (deductibles, history).  
-- Draft a formal, high-stakes appeal letter.
+- **ETL:** Extracting and cleaning real-time market data and news.
+- **Analysis:** Synthesizing conflicting data points (e.g., "Technicals are good, Sentiment is bad").
+- **Reporting:** Drafting a professional, evidence-based research note.
 
 Agents fit because:
 
 **Specialization:**
+- A **Data Agent** is optimized for reliable API interaction and state management.
+- A **Signal Agent** is optimized for pattern recognition and hypothesis generation.
+- A **Reporting Agent** is optimized for mathematical validation and clear communication.
 
-- An Auditor agent is optimized for analytical, fact-finding work.  
-- An Advocate agent is optimized for writing clear, persuasive, legalistic appeals.  
-
-- Sequential workflow: Using a SequentialAgent guarantees the policy is checked first, and only then is a letter generated.  
-- Tool use: Agents can reliably call tools like `analyze_bill_image` and `policy_rag_lookup` instead of “hallucinating” coverage rules.  
-- Long-term memory: A memory service lets the system remember deductibles, prior authorizations, and patient details across sessions, reducing user friction.  
-- Safety: A guardrail plugin ensures the agent stays in its lane (billing advocacy) and does not drift into medical diagnosis.
+**Workflow & Safety:**
+- **Sequential workflow:** Using a `SequentialAgent` guarantees data is fetched and cleaned *before* analysis begins, preventing hallucinations based on missing data.
+- **Tool use:** Agents reliably call tools like `fetch_market_data` and `local_backtest` instead of trying to do math or quote prices from their training data.
+- **Shared State:** Instead of passing massive dataframes through the LLM context window (which is expensive and error-prone), agents read/write to a shared `ToolContext` state.
+- **Safety:** A custom guardrail plugin ensures the agent analyzes data but never gives reckless financial advice (e.g., "Go all in"), protecting the user and the platform.
 
 ---
 
 ### What I created — overall architecture
 
-**Project Name:** ClaimAlly 
+**Project Name:** Agentic Quant Research Lab
 
-**High-level architecture:** Hierarchical & Sequential Multi-Agent System
+**High-level architecture:** Sequential Multi-Agent System with Shared State
 
 #### Input
+User prompt: "Run a research cycle on NVDA."
 
-User uploads:
-
-- Image of a medical bill (JPEG/PNG).  
-- PDF of their insurance policy.  
-
-#### Agent A – “The Forensic Auditor”
-
-- **Type:** Agent  
+#### Agent A – “The Data Engineer”
+- **Type:** Agent (`Quant_Data_Agent`)
 
 **Responsibilities:**
+- Call `fetch_market_data(ticker)` to retrieve historical pricing via `yfinance` and save it to the shared state.
+- Call `fetch_news_sentiment(ticker)` via `duckduckgo_search` to get real-time headlines (with a robust fallback mechanism if the API is blocked).
+- Call `compute_simple_factors` to calculate Momentum and Volatility metrics.
+- **Output:** A JSON summary of available data (not the raw data itself).
 
-- Call `analyze_bill_image(image_path)` to extract:
-  - Service date  
-  - CPT codes  
-  - Billed amounts  
-  - Denial reason  
-- Call `policy_rag_lookup(query)` to search coverage clauses in the policy PDF.  
-- Call `load_memory` to pull patient-specific context (deductible status, pre-authorizations).  
-- Produce a structured Discrepancy Report explaining where the denial conflicts with policy language.  
-
-- **Output key:** `audit_report`
-
-#### Memory Service – “The Filing Cabinet”
-
-- **Implementation:** `InMemoryMemoryService` (swappable later for `VertexAiMemoryBankService`).  
+#### Memory Service – “The Shared State”
+- **Implementation:** `ToolContext` state dictionary + `InMemoryMemoryService`.
 
 **Stores:**
+- Heavy DataFrames (OHLCV data).
+- Raw news lists.
+- Computed factor arrays.
 
-- Patient identifiers (name, policy ID).  
-- Deductible status & relevant history.  
+Accessed via tools to prevent context window bloat.
 
-Accessed via the `load_memory` tool.
-
-#### Agent B – “The Advocate”
-
-- **Type:** Agent  
+#### Agent B – “The Signal Analyst”
+- **Type:** Agent (`Quant_Signal_Research_Agent`)
 
 **Responsibilities:**
+- Read the data summary from Agent A.
+- Analyze the sentiment of the fetched headlines.
+- Cross-reference sentiment with technical factors.
+- **Output:** A structured `signal_spec` containing a hypothesis (e.g., "Bullish Divergence detected").
 
-- Read `{audit_report}` from Agent A.  
-- Draft a formal Appeal Letter:
-  - Cites specific policy sections from the RAG lookup.  
-  - References CPT codes and dates of service.  
-  - Uses a firm, professional, legalistic tone.  
-  - Outputs text ready for PDF export.  
+#### Agent C – “The Reporter”
+- **Type:** Agent (`Quant_Reporting_Agent`)
 
-- **Output key:** `final_appeal_letter`
+**Responsibilities:**
+- Read the `signal_spec`.
+- Call `local_backtest` to mathematically validate the hypothesis against the historical data stored in state.
+- Draft a formal Research Note:
+  - Cites specific metrics (Sharpe Ratio, CAGR).
+  - Summarizes news sentiment.
+  - Provides a clear conclusion.
+- **Output:** Final Markdown report.
 
-#### Orchestrator – “PatientAdvocateWorkflow”
-
-- **Type:** `SequentialAgent`  
-- `sub_agents = [auditor_agent, advocate_agent]`  
+#### Orchestrator – “AgenticQuantLab_Workflow”
+- **Type:** `SequentialAgent`
+- `sub_agents = [data_agent, signal_agent, report_agent]`
 
 **Enforces the pipeline:**
+Ingest Data → Detect Signal → Validate & Report.
 
-- Run Auditor → produce `audit_report`.  
-- Pass `audit_report` into Advocate → produce `final_appeal_letter`.  
-
-#### Safety Plugin – “MedicalAdviceGuardrail”
-
-- **Type:** `BasePlugin`  
-- **Hook:** `before_agent_callback`  
+#### Safety Plugin – “NoTradeAdviceGuardrail”
+- **Type:** `BasePlugin`
+- **Hook:** `before_agent_callback`
 
 **Behavior:**
-
-- Checks user input for medical-diagnosis language (e.g., “diagnose”, “symptoms”, “lump”).  
-- If triggered, raises an error and redirects the user away from medical advice toward consulting a physician.  
+- Checks user input for high-risk financial keywords (e.g., "buy", "sell", "short", "go all in").
+- If triggered, logs a warning and can block the request to ensure Responsible AI compliance.
 
 ---
 
 ### Demo — how the solution works from a user’s perspective
 
-#### Upload step
+#### Request step
+The user types: "Run a research cycle on NVDA (Nvidia). Find a signal and write a report."
 
-The user uploads a photo of their medical bill and the PDF of their insurance policy into the interface.
+#### Data phase
+The Data Agent:
+- Connects to Yahoo Finance to pull the last 252 days of price data.
+- Scrapes DuckDuckGo for the latest news headlines.
+- Computes technical factors (e.g., 5-day Momentum).
+- Saves all heavy data to the session state hidden from the LLM's context window.
 
-#### Audit phase
+#### Analysis phase
+The Signal Agent:
+- Notices that while the news is negative (e.g., "Competition fears"), the price momentum is positive.
+- Formulates a "Climbing a Wall of Worry" hypothesis: The stock is resilient despite bad news.
 
-The Auditor agent:
-
-- “Reads” the bill via `analyze_bill_image`.  
-- Looks up coverage rules for those CPT codes via `policy_rag_lookup`.  
-- Uses `load_memory` to check whether the deductible is already met.  
-- Outputs a Discrepancy Report, e.g.:
-
-> “CPT 99214 is listed as ‘Not Medically Necessary’, but Section 4.2 states CPT 99201–99215 are covered 100% after deductible for acute symptoms, which are documented in the visit notes.”
-
-#### Advocacy phase
-
-The Advocate agent:
-
-- Consumes the `audit_report`.  
-- Generates a polished appeal letter addressed to the insurance company:
-  - Includes patient details, claim number, dates of service.  
-  - Quotes the exact policy section returned by the RAG tool.  
-  - Argues clearly why the denial should be overturned.  
-
-Returns the `final_appeal_letter`, ready for the user to:
-
-- Download as PDF or  
-- Paste into their insurer’s appeal portal.  
+#### Reporting phase
+The Reporting Agent:
+- Runs a vector backtest on the chosen momentum factor.
+- Determines the strategy yielded a **Sharpe Ratio of 1.89**.
+- Generates the final note:
+> "**Conclusion:** The 5-day momentum factor demonstrates a positive historical performance with a favorable Sharpe Ratio. The absence of price drops despite negative news sentiment suggests strong underlying demand."
 
 #### Safety checks
-
-If the user asks, for example, “Can you diagnose this pain?” the `MedicalAdviceGuardrail` intercepts the request and blocks the agent from answering with clinical advice.
+If the user asks, "Should I bet my life savings on this?", the `NoTradeAdviceGuardrail` intercepts the request and prevents the agent from responding.
 
 ---
 
@@ -157,83 +136,56 @@ If the user asks, for example, “Can you diagnose this pain?” the `MedicalAdv
 #### Core stack
 
 ##### Agent framework
-
 Google Agent Development Kit (ADK):
-
-- `Agent`, `SequentialAgent` for orchestration.  
-- `InMemoryMemoryService` for long-term context.  
-- `BasePlugin` for safety guardrails and governance.  
+- `SequentialAgent` for deterministic orchestration.
+- `ToolContext` for managing shared state between agents.
+- `BasePlugin` for safety guardrails.
+- `LoggingPlugin` for observability and debugging.
 
 ##### Model
-
-Gemini 2.5 Pro (via `Gemini(model="gemini-2.5-pro")`):
-
-- Strong reasoning over long policy text.  
-- Multimodal capabilities (bill image reading in a real deployment).  
+Gemini 2.5 Flash (via `Gemini(model="gemini-2.5-flash")`):
+- Chosen for high throughput and low latency, essential for multi-step reasoning chains.
 
 ##### Custom tools (Function Tool pattern)
-
-- `analyze_bill_image(image_path: str) -> dict`  
-  - Simulated multimodal extraction of:
-    - Service date  
-    - CPT code  
-    - Billed amount  
-    - Denial reason  
-
-- `policy_rag_lookup(query: str) -> str`  
-  - Simulated RAG lookup into the user’s insurance policy PDF, returning the exact clause text.  
-
-- `load_memory`  
-  - Reads from `InMemoryMemoryService` (e.g., whether the user’s deductible is met).  
+- `fetch_market_data`
+  - Integrates `yfinance` to pull real-world OHLCV data.
+  - Saves data to `context.state` to avoid token limits.
+- `fetch_news_sentiment`
+  - Integrates `duckduckgo_search`.
+  - **Innovation:** Includes a "Circuit Breaker" fallback. If the live search is rate-limited, it returns cached/fallback data so the pipeline doesn't crash.
+- `local_backtest`
+  - Uses `numpy` and `pandas` to perform vector-based simulation of trading strategies.
 
 #### Agents
-
-- `auditor_agent`:
-  - Uses all tools (`analyze_bill_image`, `policy_rag_lookup`, `load_memory`).  
-  - Outputs structured `audit_report`.  
-
-- `advocate_agent`:
-  - Consumes `audit_report`.  
-  - Produces `final_appeal_letter`.  
+- `data_agent`: ETL specialist.
+- `signal_agent`: Qualitative/Quantitative synthesis expert.
+- `report_agent`: Validation and communication expert.
 
 #### Orchestration
-
-- `patient_advocate_system = SequentialAgent(...)`  
-- Ensures deterministic order: **Audit → Advocacy**.  
-
-#### Safety & governance
-
-- `MedicalAdviceGuardrail` plugin:
-  - Uses a keyword check (e.g., “diagnose”, “cancer”, “symptoms”) to prevent medical advice.  
-  - Raises an exception and stops unsafe runs.  
+- `quant_workflow = SequentialAgent(...)`
+- Ensures that analysis never happens before data is fully prepped and cleaned.
 
 ---
 
 ### If I had more time, this is what I’d do
 
-If I extend The Patient Advocate beyond this blueprint, I’d:
+If I extend the Agentic Quant Research Lab beyond this blueprint, I’d:
 
-- **Replace simulated tools with production integrations**
-  - Connect `analyze_bill_image` to real Gemini Vision or OCR for robust CPT/ICD-10 extraction.  
+- **Integrate a Vector Database for "Market Memory"**
+  - Swap `InMemoryMemoryService` for `Vertex AI Vector Search`.
+  - Allow the agent to recall historical market regimes (e.g., "This setup looks like the 2020 crash") to provide deeper context.
 
-- **Build a true RAG pipeline:**
-  - Chunk and embed the user’s policy PDF.  
-  - Query a vector database (e.g., Vertex AI, Pinecone, or similar) for precise clause retrieval.  
+- **Add a "Human-in-the-Loop" Approval Step**
+  - Pause the workflow after the Signal Agent proposes a hypothesis.
+  - Present the hypothesis to the human trader.
+  - Only proceed to the expensive Backtest phase if the human clicks "Approve."
 
-- **Upgrade memory from in-memory to persistent**
-  - Swap `InMemoryMemoryService` for a persistent memory layer (e.g., `VertexAiMemoryBankService` or a database) so:
-    - Users can return over months and keep a longitudinal history of claims, deductibles, and appeals.  
-    - The system can detect patterns of repeated denials.  
+- **Expand Tooling to Fundamentals**
+  - Add a tool to fetch SEC filings (10-K, 10-Q) via EDGAR.
+  - Allow the agent to analyze balance sheet health alongside price action.
 
-- **Add a “Claim Tracker” layer**
-  - Track status: Submitted → Under Review → Approved/Denied.  
-  - Generate follow-up letters or escalation templates when deadlines approach.  
+- **Live Paper Trading**
+  - Connect the final output to a paper-trading API (like Alpaca).
+  - Allow the agent to execute the trade in a sandbox environment if the backtest metrics exceed a certain threshold.
 
-- **Multi-language support**
-  - Support appeals in Spanish, French, etc., while keeping policy citations and codes accurate.  
-
-- **User interface + integrations**
-  - Simple web UI where users drag-and-drop bills and policies.  
-  - Optional integration with insurer portals (where allowed) to pre-fill appeal forms.  
-
-That roadmap would turn The Patient Advocate from a working capstone prototype into a powerful, real-world tool for helping patients fight unfair medical bills.
+That roadmap would turn the Agentic Quant Research Lab from a powerful analysis tool into a fully autonomous algorithmic trading assistant.
